@@ -1,5 +1,5 @@
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from transformers import pipeline
 
 def query_policies(query, index_path="../data/policy_index"):
@@ -8,18 +8,18 @@ def query_policies(query, index_path="../data/policy_index"):
     db = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
     retriever = db.as_retriever(search_kwargs={"k": 3})
 
-    # Retrieve docs
-    results = retriever.get_relevant_documents(query)
-    docs_text = " ".join([doc.page_content for doc in results])
+    # Retrieve docs (new API: invoke)
+    results = retriever.invoke(query)
 
-    # Summarize (use BART for now)
+    # Summarize only the top-1 doc for precise answers
+    top_doc_text = results[0].page_content if results else "No relevant policies found."
     summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-    summary = summarizer(docs_text, max_length=120, min_length=30, do_sample=False)
+    summary = summarizer(top_doc_text, max_length=120, min_length=30, do_sample=False)
 
     return {
         "query": query,
-        "top_k": [doc.page_content for doc in results],
-        "summary": summary[0]['summary_text']
+        "summary": summary[0]['summary_text'],
+        "top_k": [doc.page_content for doc in results]
     }
 
 if __name__ == "__main__":
