@@ -99,33 +99,30 @@ uvicorn src.app:app --reload
 
 
 ## 📊 Business ROI Calculator
-
-## 📊 Business ROI Calculator
-
- 
+  
 Here’s a simple ROI model for **PolicyBot**:
 
-**Scenario: 5,000 Employees**
-
+### Scenario: 5,000 Employees
 - Average salary: **$40/hour**  
 - Policy lookups per employee: **6 per year**  
-- Time wasted per lookup: **30 minutes**  
+- Time wasted per lookup: **30 minutes**
 
 ---
 
 ### ❌ Without PolicyBot
 - 5,000 × 6 × 0.5 hrs = **15,000 hours wasted/year**  
-- 15,000 × $40 = **$600,000 lost productivity/year**  
+- 15,000 × $40 = **$600,000 lost productivity/year**
 
 ---
 
 ### ✅ With PolicyBot (80% faster)
 - Only **3,000 hours wasted/year**  
-- → **$480,000 saved annually**  
+- **$480,000 saved annually**
 
 ---
 
-💡 **Scales with company size:**  
-A **50,000-employee enterprise** can save **$4.8M per year**.
+💡 **Scales with company size**:  
+A 50,000-employee enterprise can save **$4.8M per year**.
+
  
 
