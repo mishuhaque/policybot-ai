@@ -1,3 +1,5 @@
+![Visitors](https://visitor-badge.glitch.me/badge?page_id=mishuhaque.policybot-ai)
+
 # 📘 PolicyBot – AI Policy Assistant
 
 🚀 **PolicyBot** is an **AI-powered assistant** that makes company policies instantly accessible and understandable.  
