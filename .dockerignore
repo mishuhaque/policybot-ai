@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+data/policy_index
+notebooks/
+tests/
+*.md
+.env
+.env.*
+terraform/
+.github/
