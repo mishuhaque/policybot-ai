@@ -5,3 +5,6 @@ faiss-cpu
 langchain
 fastapi
 uvicorn
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
