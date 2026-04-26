@@ -79,29 +79,15 @@ pip install -r requirements.txt
 ```
 
 ### Set Up Your Index
-By default, the repository ships with toy policies in `data/`. To build an index with your own documents you have two options:
+By default, the repository ships with toy policies in `data/`. To build an index with your own documents:
+1. Load or parse your policies into a Python list of strings (each string represents one document or section).
+2. Update the `sample_policies` list in `src/ingest.py`, or import `build_index` from another script/notebook and pass in your list.
+3. Run the script to generate the FAISS artifacts:
+   ```bash
+   python src/ingest.py
+   ```
 
-**1. Command-line ingestion**
-
-```bash
-python src/ingest.py --input /path/to/policies --output data/policy_index \
-  --chunk-size 750 --chunk-overlap 75
-```
-
-* `--input` accepts either a single `.txt`/`.md` file or a directory containing multiple documents.
-* `--output` controls where the FAISS files are written (defaults to `data/policy_index`).
-* `--chunk-size`, `--chunk-overlap`, and `--embedding-model` expose the same knobs available in code.
-
-**2. Programmatic ingestion**
-
-```python
-from src.ingest import build_index
-
-policies = ["My first policy section", "My second policy section"]
-build_index(policies, save_path="data/policy_index")
-```
-
-The CLI uses UTF-8 by default and will ignore empty/whitespace-only documents. If you receive a "No valid policy text provided" error, check that the source files contain readable text.
+The index is saved to `data/policy_index` by default. You can change the destination by passing a different `save_path` when calling `build_index` programmatically.
 
 ### Run the API
 ```bash
@@ -112,22 +98,12 @@ Available endpoints:
 - `POST /ask` – form submission with `query="Your question"`
 
 ### Query the Assistant
-The `/ask` endpoint now accepts either JSON or traditional form data.
-
-**JSON payload (recommended):**
-```bash
-curl -X POST "http://127.0.0.1:8000/ask" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What is the parental leave policy?", "top_k": 5}'
-```
-
-**Form payload (backwards compatible):**
+Using `curl` with a form body (matches the FastAPI signature):
 ```bash
 curl -X POST "http://127.0.0.1:8000/ask" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "query=What is the parental leave policy?"
 ```
-
 Example JSON response:
 ```json
 {

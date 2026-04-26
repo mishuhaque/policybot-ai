@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
@@ -10,11 +11,17 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 
-from utils import clean_corpus
+from .utils import clean_text
 
-DEFAULT_INDEX_PATH = Path("../data/policy_index")
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_INDEX_PATH = Path(_script_dir) / ".." / "data" / "policy_index"
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 SUPPORTED_SUFFIXES = (".md", ".txt")
+
+
+def clean_corpus(texts: Sequence[str]) -> List[str]:
+    """Clean a corpus of policy texts."""
+    return [clean_text(text) for text in texts]
 
 
 def build_index(

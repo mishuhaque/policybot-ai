@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import List
@@ -11,7 +12,8 @@ from langchain_community.vectorstores import FAISS
 from pydantic import BaseModel, Field
 from transformers import pipeline
 
-DEFAULT_INDEX_PATH = Path("../data/policy_index")
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_INDEX_PATH = Path(_script_dir) / ".." / "data" / "policy_index"
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_SUMMARIZER_MODEL = "facebook/bart-large-cnn"
 SUMMARY_CONFIG = {"max_length": 120, "min_length": 30, "do_sample": False}
