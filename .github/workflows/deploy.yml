@@ -1,0 +1,183 @@
+name: Build, Push & Deploy to ECS
+
+on:
+  push:
+    branches:
+      - main        # → prod deploy
+      - develop     # → dev deploy
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: policybot
+
+jobs:
+  # ─────────────────────────────────────────
+  # Stage 1: Run tests before building image
+  # ─────────────────────────────────────────
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run unit tests
+        run: pytest tests/ -v --tb=short
+
+  # ─────────────────────────────────────────
+  # Stage 2: Build Docker image & push to ECR
+  # ─────────────────────────────────────────
+  build-and-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      image-uri: ${{ steps.build.outputs.image-uri }}
+      environment: ${{ steps.env.outputs.environment }}
+
+    permissions:
+      id-token: write   # Required for OIDC
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine target environment
+        id: env
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "image-tag=prod-${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "image-tag=dev-${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-policybot-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ steps.env.outputs.image-tag }}
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          docker build -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "image-uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+
+  # ─────────────────────────────────────────
+  # Stage 3: Deploy to ECS Fargate
+  # ─────────────────────────────────────────
+  deploy:
+    name: Deploy to ECS (${{ needs.build-and-push.outputs.environment }})
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: ${{ needs.build-and-push.outputs.environment }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-policybot-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set cluster and service names
+        id: names
+        run: |
+          ENV="${{ needs.build-and-push.outputs.environment }}"
+          if [[ "$ENV" == "prod" ]]; then
+            echo "cluster=policybot-cluster" >> $GITHUB_OUTPUT
+            echo "service=policybot-service" >> $GITHUB_OUTPUT
+            echo "family=policybot-task" >> $GITHUB_OUTPUT
+          else
+            echo "cluster=policybot-dev-cluster" >> $GITHUB_OUTPUT
+            echo "service=policybot-dev-service" >> $GITHUB_OUTPUT
+            echo "family=policybot-dev-task" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ steps.names.outputs.family }} \
+            --query taskDefinition \
+            > task-def.json
+
+      - name: Update image in task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-def.json
+          container-name: ${{ steps.names.outputs.family }}-app
+          image: ${{ needs.build-and-push.outputs.image-uri }}
+
+      - name: Deploy updated task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ steps.names.outputs.service }}
+          cluster: ${{ steps.names.outputs.cluster }}
+          wait-for-service-stability: true
+
+  # ─────────────────────────────────────────
+  # Stage 4: Smoke test via ALB
+  # ─────────────────────────────────────────
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: [deploy, build-and-push]
+    if: needs.build-and-push.outputs.environment == 'prod'
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-policybot-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get ALB DNS
+        id: alb
+        run: |
+          DNS=$(aws elbv2 describe-load-balancers \
+            --names policybot-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)
+          echo "dns=${DNS}" >> $GITHUB_OUTPUT
+
+      - name: Health check
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ steps.alb.outputs.dns }}/)
+          if [[ "$STATUS" != "200" ]]; then
+            echo "Health check failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "Health check passed: HTTP $STATUS"
