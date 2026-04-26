@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Form
-from rag_pipeline import query_policies
+from .rag_pipeline import query_policies
 
 app = FastAPI()
 

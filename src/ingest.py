@@ -3,7 +3,12 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 
-def build_index(policy_texts, save_path="../data/policy_index"):
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_default_save_path = os.path.join(_script_dir, "..", "data", "policy_index")
+
+def build_index(policy_texts, save_path=None):
+    if save_path is None:
+        save_path = _default_save_path
     # Split policies into chunks
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     docs = splitter.create_documents(policy_texts)
