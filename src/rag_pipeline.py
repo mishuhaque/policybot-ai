@@ -1,8 +1,14 @@
+import os
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from transformers import pipeline
 
-def query_policies(query, index_path="../data/policy_index"):
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_default_index_path = os.path.join(_script_dir, "..", "data", "policy_index")
+
+def query_policies(query, index_path=None):
+    if index_path is None:
+        index_path = _default_index_path
     # Load FAISS index
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     db = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
